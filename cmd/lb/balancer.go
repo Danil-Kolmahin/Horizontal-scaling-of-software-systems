@@ -7,6 +7,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/roman-mazur/design-practice-2-template/httptools"
@@ -14,20 +16,22 @@ import (
 )
 
 var (
-	port = flag.Int("port", 8090, "load balancer port")
+	port       = flag.Int("port", 8090, "load balancer port")
 	timeoutSec = flag.Int("timeout-sec", 3, "request timeout time in seconds")
-	https = flag.Bool("https", false, "whether backends support HTTPs")
+	https      = flag.Bool("https", false, "whether backends support HTTPs")
 
 	traceEnabled = flag.Bool("trace", false, "whether to include tracing information into responses")
 )
 
 var (
-	timeout = time.Duration(*timeoutSec) * time.Second
+	timeout     = time.Duration(*timeoutSec) * time.Second
 	serversPool = []string{
-		"server1:8080",
-		"server2:8080",
-		"server3:8080",
+		"localhost:8080",
+		"localhost:8081",
+		"localhost:8082",
 	}
+	counter     = 0
+	healthArray = []bool{false, false, false}
 )
 
 func scheme() string {
@@ -51,13 +55,15 @@ func health(dst string) bool {
 	return true
 }
 
-func forward(dst string, rw http.ResponseWriter, r *http.Request) error {
+func forward(dst string, rw http.ResponseWriter, r *http.Request, i int) error {
 	ctx, _ := context.WithTimeout(r.Context(), timeout)
 	fwdRequest := r.Clone(ctx)
 	fwdRequest.RequestURI = ""
 	fwdRequest.URL.Host = dst
 	fwdRequest.URL.Scheme = scheme()
 	fwdRequest.Host = dst
+	fwdRequest.Header.Set("lb-author", "xyz")
+	fwdRequest.Header.Set("lb-req-cnt", strconv.Itoa(i))
 
 	resp, err := http.DefaultClient.Do(fwdRequest)
 	if err == nil {
@@ -84,22 +90,43 @@ func forward(dst string, rw http.ResponseWriter, r *http.Request) error {
 	}
 }
 
+func hash(addr string) int {
+	addr = strings.Replace(addr, "[", "", -1)
+	addr = strings.Replace(addr, "]", "", -1)
+	addr = strings.Replace(addr, ":", "", -1)
+	res, _ := strconv.Atoi(addr)
+	return res
+}
+
 func main() {
 	flag.Parse()
 
 	// TODO: Використовуйте дані про стан сервреа, щоб підтримувати список тих серверів, яким можна відправляти ззапит.
-	for _, server := range serversPool {
+	for i, server := range serversPool {
 		server := server
+		i := i
 		go func() {
 			for range time.Tick(10 * time.Second) {
-				log.Println(server, health(server))
+				healthNow := health(server)
+				healthArray[i] = healthNow
+				log.Println(server, healthNow)
 			}
 		}()
 	}
 
 	frontend := httptools.CreateServer(*port, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		// TODO: Рееалізуйте свій алгоритм балансувальника.
-		forward(serversPool[0], rw, r)
+		counter++
+		i := hash(r.RemoteAddr) % len(serversPool)
+		for i := i; i <= len(serversPool); i++ {
+			if healthArray[i%len(serversPool)] == true {
+				forward(serversPool[i%len(serversPool)], rw, r, counter)
+				break
+			}
+			if i == len(serversPool) {
+				println("ERROR")
+			}
+		}
 	}))
 
 	log.Println("Starting load balancer...")
