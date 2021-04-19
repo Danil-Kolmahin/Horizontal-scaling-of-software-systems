@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -95,6 +96,8 @@ func hash(addr string) int {
 	addr = strings.Replace(addr, "]", "", -1)
 	addr = strings.Replace(addr, ":", "", -1)
 	res, _ := strconv.Atoi(addr)
+	rand.Seed(int64(res))
+	res = rand.Int()
 	return res
 }
 
@@ -122,8 +125,7 @@ func main() {
 			if healthArray[i%len(serversPool)] == true {
 				forward(serversPool[i%len(serversPool)], rw, r, counter)
 				break
-			}
-			if i == len(serversPool) {
+			} else if i == len(serversPool) {
 				println("ERROR")
 			}
 		}
