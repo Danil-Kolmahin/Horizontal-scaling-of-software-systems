@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/roman-mazur/design-practice-2-template/httptools"
-	"github.com/roman-mazur/design-practice-2-template/signal"
+	"github.com/KolmaginDanil/Horizontal-scaling-of-software-systems/httptools"
+	"github.com/KolmaginDanil/Horizontal-scaling-of-software-systems/signal"
 )
 
 var (
@@ -61,7 +61,7 @@ func forward(dst string, rw http.ResponseWriter, r *http.Request, i int) error {
 	fwdRequest.URL.Host = dst
 	fwdRequest.URL.Scheme = scheme()
 	fwdRequest.Host = dst
-	fwdRequest.Header.Set("lb-author", "xyz")
+	fwdRequest.Header.Set("lb-author", "someAuthor")
 	fwdRequest.Header.Set("lb-req-cnt", strconv.Itoa(i))
 
 	resp, err := http.DefaultClient.Do(fwdRequest)
