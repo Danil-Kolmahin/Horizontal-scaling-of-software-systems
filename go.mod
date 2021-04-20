@@ -1,3 +1,3 @@
-module github.com/roman-mazur/design-practice-2-template
+module github.com/KolmaginDanil/Horizontal-scaling-of-software-systems
 
 go 1.15

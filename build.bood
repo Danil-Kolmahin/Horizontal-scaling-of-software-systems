@@ -1,7 +1,8 @@
-go_binary {
+go_testedbinary {
   name: "server",
   // TODO: Відкорегуйте ім'я пакета.
-  pkg: "github.com/roman-mazur/design-practice-2-template/cmd/server",
+  pkg: "github.com/KolmaginDanil/Horizontal-scaling-of-software-systems/cmd/server",
+  testPkg: "github.com/KolmaginDanil/Horizontal-scaling-of-software-systems/cmd/server",
   srcs: [
     "httptools/**/*.go",
     "signal/**/*.go",
@@ -9,10 +10,11 @@ go_binary {
   ]
 }
 
-go_binary {
+go_testedbinary {
   name: "lb",
   // TODO: Відкорегуйте ім'я пакета.
-  pkg: "github.com/roman-mazur/design-practice-2-template/cmd/lb",
+  pkg: "github.com/KolmaginDanil/Horizontal-scaling-of-software-systems/cmd/lb",
+  testPkg: "github.com/KolmaginDanil/Horizontal-scaling-of-software-systems/cmd/lb",
   srcs: [
     "httptools/**/*.go",
     "signal/**/*.go",
