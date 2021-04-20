@@ -31,8 +31,6 @@ var (
 		"localhost:8081",
 		"localhost:8082",
 	}
-	counter     = 0
-	healthArray = []bool{false, false, false}
 )
 
 func scheme() string {
@@ -95,6 +93,7 @@ func hash(addr string) int {
 	addr = strings.Replace(addr, "[", "", -1)
 	addr = strings.Replace(addr, "]", "", -1)
 	addr = strings.Replace(addr, ":", "", -1)
+	addr = strings.Replace(addr, ".", "", -1)
 	res, _ := strconv.Atoi(addr)
 	rand.Seed(int64(res))
 	res = rand.Int()
@@ -103,6 +102,11 @@ func hash(addr string) int {
 
 func main() {
 	flag.Parse()
+	counter := 0
+	healthArray := make([]bool, len(serversPool))
+	for i := range healthArray {
+		healthArray[i] = false
+	}
 
 	// TODO: Використовуйте дані про стан сервреа, щоб підтримувати список тих серверів, яким можна відправляти ззапит.
 	for i, server := range serversPool {
@@ -120,12 +124,12 @@ func main() {
 	frontend := httptools.CreateServer(*port, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		// TODO: Рееалізуйте свій алгоритм балансувальника.
 		counter++
-		i := hash(r.RemoteAddr) % len(serversPool)
-		for i := i; i <= len(serversPool); i++ {
-			if healthArray[i%len(serversPool)] == true {
+		serverIndex := hash(r.RemoteAddr) % len(serversPool)
+		for i := serverIndex; i <= serverIndex+len(serversPool); i++ {
+			if healthArray[i%len(serversPool)] {
 				forward(serversPool[i%len(serversPool)], rw, r, counter)
 				break
-			} else if i == len(serversPool) {
+			} else if i == serverIndex+len(serversPool) {
 				println("ERROR")
 			}
 		}
