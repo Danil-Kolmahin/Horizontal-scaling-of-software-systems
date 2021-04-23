@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -27,9 +28,9 @@ var (
 var (
 	timeout     = time.Duration(*timeoutSec) * time.Second
 	serversPool = []string{
-		"localhost:8080",
-		"localhost:8081",
-		"localhost:8082",
+		"server1:8080",
+		"server2:8080",
+		"server3:8080",
 	}
 )
 
@@ -40,6 +41,7 @@ func scheme() string {
 	return "http"
 }
 
+// if the server responds to the request and returns 200 then true, if not - false
 func health(dst string) bool {
 	ctx, _ := context.WithTimeout(context.Background(), timeout)
 	req, _ := http.NewRequestWithContext(ctx, "GET",
@@ -54,6 +56,7 @@ func health(dst string) bool {
 	return true
 }
 
+// send data for one of the servers and after forward this data to client
 func forward(dst string, rw http.ResponseWriter, r *http.Request, i int) error {
 	ctx, _ := context.WithTimeout(r.Context(), timeout)
 	fwdRequest := r.Clone(ctx)
@@ -89,7 +92,9 @@ func forward(dst string, rw http.ResponseWriter, r *http.Request, i int) error {
 	}
 }
 
+// when the same string is entered, the same number will be returned (for testing)
 func hash(addr string) int {
+	log.Println(addr)
 	addr = strings.Replace(addr, "[", "", -1)
 	addr = strings.Replace(addr, "]", "", -1)
 	addr = strings.Replace(addr, ":", "", -1)
@@ -97,18 +102,31 @@ func hash(addr string) int {
 	res, _ := strconv.Atoi(addr)
 	rand.Seed(int64(res))
 	res = rand.Int()
+	log.Println(res)
 	return res
+}
+
+//find a live server
+func balance(serversHealth []bool, serverIndex int) (int, error) {
+	serversLength := len(serversHealth)
+	for i := serverIndex; i <= serverIndex+serversLength; i++ {
+		if serversHealth[i%serversLength] {
+			return i % len(serversHealth), nil
+		}
+	}
+	return -1, errors.New("all servers is dead")
 }
 
 func main() {
 	flag.Parse()
 	counter := 0
+	//all servers dead
 	healthArray := make([]bool, len(serversPool))
 	for i := range healthArray {
 		healthArray[i] = false
 	}
 
-	// TODO: Використовуйте дані про стан сервреа, щоб підтримувати список тих серверів, яким можна відправляти ззапит.
+	//after 10 sec check and change servers health status
 	for i, server := range serversPool {
 		server := server
 		i := i
@@ -122,16 +140,13 @@ func main() {
 	}
 
 	frontend := httptools.CreateServer(*port, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		// TODO: Рееалізуйте свій алгоритм балансувальника.
 		counter++
-		serverIndex := hash(r.RemoteAddr) % len(serversPool)
-		for i := serverIndex; i <= serverIndex+len(serversPool); i++ {
-			if healthArray[i%len(serversPool)] {
-				forward(serversPool[i%len(serversPool)], rw, r, counter)
-				break
-			} else if i == serverIndex+len(serversPool) {
-				println("ERROR")
-			}
+		serversIndex := hash(r.RemoteAddr)
+		serverNumber, err := balance(healthArray, serversIndex)
+		if err != nil {
+			log.Println(err)
+		} else {
+			forward(serversPool[serverNumber], rw, r, counter)
 		}
 	}))
 

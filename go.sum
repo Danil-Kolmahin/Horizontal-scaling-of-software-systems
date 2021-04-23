@@ -1,6 +1,13 @@
 github.com/BohdanShmalko/Implementation-assembly-system v0.0.0-20210319080012-261ccd16e77b h1:IJe5TDCr0inau7YCg8c9Y9e+yNLBgi6JNWV4p2WqfFY=
 github.com/BohdanShmalko/Implementation-assembly-system v0.0.0-20210319080012-261ccd16e77b/go.mod h1:qixH78rq0/NPk9eqANQ0PuWa6io8wpI+5OjidFH0QZs=
+github.com/kr/pretty v0.2.1 h1:Fmg33tUaq4/8ym9TJN1x7sLJnHVwhP33CNkpYV/7rwI=
+github.com/kr/pretty v0.2.1/go.mod h1:ipq/a2n7PKx3OHsz4KJII5eveXtPO4qwEXGdVfWzfnI=
+github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
+github.com/kr/text v0.1.0 h1:45sCR5RtlFHMR4UwH9sdQ5TC8v0qDQCHnXt+kaKSTVE=
+github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
 github.com/roman-mazur/blueprint v0.0.0-20200310221250-fc31433fc3c0/go.mod h1:XjUnsvcdWlyS1DoCAZHjS8jPbP1bs2O3WSrDMgG7Bxc=
 github.com/roman-mazur/bood v0.0.6/go.mod h1:w66c0jFfvSmRX1lP0p5kwz4373VuJYOhX02O6cQxFgc=
 github.com/roman-mazur/design-practice-2-template v0.0.0-20210409213423-4305d6876bbb h1:i2oa4s5sBUCQ6gYqJFZd9j7aG3zYfNmQYmz7By8sfhM=
 github.com/roman-mazur/design-practice-2-template v0.0.0-20210409213423-4305d6876bbb/go.mod h1:F97qf7w4/qeZJzD0JxJMxgEuHRzW39jwrdDVuZD0dRs=
+gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c h1:Hei/4ADfdWqJk1ZMxUNpqntNwaWcugrBjAiHlqqRiVk=
+gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c/go.mod h1:JHkPIbrfpd72SG/EVd6muEfDQjcINNoR0C8j2r3qZ4Q=
