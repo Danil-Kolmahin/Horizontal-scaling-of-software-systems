@@ -2,12 +2,11 @@ FROM golang:1.15 as build
 
 RUN apt-get update && apt-get install -y ninja-build
 
-# TODO: Змініть на власну реалізацію системи збірки
 RUN go get -u github.com/BohdanShmalko/Implementation-assembly-system/build/cmd/bood
+RUN go get gopkg.in/check.v1
 
 WORKDIR /go/src/practice-2
 COPY . .
 
 # TODO: Замініть на запуск bood, який призводить до виконання інтеграційних тестів.
-# ENTRYPOINT ["bood", "integration-tests"]
-ENTRYPOINT ["echo", "ok"]
+ENTRYPOINT ["bood", "--integration-tests=true"]

@@ -1,6 +1,5 @@
 go_testedbinary {
   name: "server",
-  // TODO: Відкорегуйте ім'я пакета.
   pkg: "github.com/KolmaginDanil/Horizontal-scaling-of-software-systems/cmd/server",
   testPkg: "github.com/KolmaginDanil/Horizontal-scaling-of-software-systems/cmd/server",
   srcs: [
@@ -12,7 +11,6 @@ go_testedbinary {
 
 go_testedbinary {
   name: "lb",
-  // TODO: Відкорегуйте ім'я пакета.
   pkg: "github.com/KolmaginDanil/Horizontal-scaling-of-software-systems/cmd/lb",
   testPkg: "github.com/KolmaginDanil/Horizontal-scaling-of-software-systems/cmd/lb",
   srcs: [
@@ -20,7 +18,15 @@ go_testedbinary {
     "signal/**/*.go",
     "cmd/lb/*.go"
   ]
-  // TODO: Додайте запуск тестів для балансувальника.
 }
 
 // TODO: Додайте модуль для інтеграційних тестів.
+integration_tests {
+  name: "integration",
+  testPkg: "github.com/KolmaginDanil/Horizontal-scaling-of-software-systems/integration",
+  srcs: [
+      "httptools/**/*.go",
+      "signal/**/*.go",
+      "cmd/lb/*.go"
+    ]
+}

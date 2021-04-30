@@ -94,7 +94,7 @@ func forward(dst string, rw http.ResponseWriter, r *http.Request, i int) error {
 
 // when the same string is entered, the same number will be returned (for testing)
 func hash(addr string) int {
-	log.Println(addr)
+	log.Println("row addr : " + addr)
 	addr = strings.Replace(addr, "[", "", -1)
 	addr = strings.Replace(addr, "]", "", -1)
 	addr = strings.Replace(addr, ":", "", -1)
@@ -102,7 +102,7 @@ func hash(addr string) int {
 	res, _ := strconv.Atoi(addr)
 	rand.Seed(int64(res))
 	res = rand.Int()
-	log.Println(res)
+	log.Println("result : " + strconv.Itoa(res))
 	return res
 }
 
@@ -123,7 +123,7 @@ func main() {
 	//all servers dead
 	healthArray := make([]bool, len(serversPool))
 	for i := range healthArray {
-		healthArray[i] = false
+		healthArray[i] = health(serversPool[i])
 	}
 
 	//after 10 sec check and change servers health status
