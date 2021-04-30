@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"math/rand"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -95,11 +96,12 @@ func forward(dst string, rw http.ResponseWriter, r *http.Request, i int) error {
 // when the same string is entered, the same number will be returned (for testing)
 func hash(addr string) int {
 	log.Println("row addr : " + addr)
-	addr = strings.Replace(addr, "[", "", -1)
-	addr = strings.Replace(addr, "]", "", -1)
-	addr = strings.Replace(addr, ":", "", -1)
-	addr = strings.Replace(addr, ".", "", -1)
-	res, _ := strconv.Atoi(addr)
+	ip, _, _ := net.SplitHostPort(addr)
+	ip = strings.Replace(ip, "[", "", -1)
+	ip = strings.Replace(ip, "]", "", -1)
+	ip = strings.Replace(ip, ":", "", -1)
+	ip = strings.Replace(ip, ".", "", -1)
+	res, _ := strconv.Atoi(ip)
 	rand.Seed(int64(res))
 	res = rand.Int()
 	log.Println("result : " + strconv.Itoa(res))

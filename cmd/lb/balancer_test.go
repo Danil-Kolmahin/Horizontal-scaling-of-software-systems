@@ -19,15 +19,15 @@ func (s *MySuite) TestHash(c *gocheck.C) {
 	}{
 		{
 			address:      "172.0.10.29:8039",
-			expectedHash: 75735823885486378,
+			expectedHash: 4884742931813001398,
 		},
 		{
 			address:      "192.168.0.101:8736",
-			expectedHash: 4319878349005173251,
+			expectedHash: 4665448710219042387,
 		},
 		{
 			address:      "127.0.0.1:8080",
-			expectedHash: 42641755437267490,
+			expectedHash: 3322369760910621837,
 		},
 	}
 	//Act

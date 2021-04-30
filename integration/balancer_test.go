@@ -14,12 +14,6 @@ var client = http.Client{
 	Timeout: 3 * time.Second,
 }
 
-var serversPool = []string{
-	"server1:8080",
-	"server2:8080",
-	"server3:8080",
-}
-
 func Test(t *testing.T) { gocheck.TestingT(t) }
 
 type MySuite struct{}
@@ -27,49 +21,28 @@ type MySuite struct{}
 var _ = gocheck.Suite(&MySuite{})
 
 func (s *MySuite) TestBalancer(c *gocheck.C) {
-	//Arrange
-	testCases := []struct {
-		address string
-		server  string
-	}{
-		{
-			address: "172.0.10.29:8121",
-			server:  serversPool[2],
-		},
-		{
-			address: "192.168.0.101:8736",
-			server:  serversPool[2],
-		},
-		{
-			address: "127.0.0.1:3005",
-			server:  serversPool[0],
-		},
+	res1, err := client.Get(fmt.Sprintf("%s/api/v1/some-data", baseAddress))
+	if err != nil {
+		c.Error(err)
 	}
+	c.Assert(res1.StatusCode, gocheck.Equals, http.StatusOK)
 
-	//Act
-	for _, data := range testCases {
-		req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v1/some-data", baseAddress), nil)
-		if err != nil {
-			c.Error(err)
-		}
-		req.RemoteAddr = data.address
-		c.Logf("request from [%s]", req.RemoteAddr)
-		res, err := client.Do(req)
-		if err != nil {
-			c.Error(err)
-		}
-		//Assert
-		server := res.Header.Get("lb-from")
-		c.Logf("response from [%s]", server)
-		c.Assert(server, gocheck.Equals, data.server)
+	res2, err := client.Get(fmt.Sprintf("%s/api/v1/some-data", baseAddress))
+	if err != nil {
+		c.Error(err)
 	}
+	c.Assert(res2.StatusCode, gocheck.Equals, http.StatusOK)
+
+	c.Assert(res1.Header.Get("lb-from"), gocheck.Equals, res2.Header.Get("lb-from"))
+
 }
 
 func (s *MySuite) BenchmarkBalancer(c *gocheck.C) {
 	for i := 0; i < c.N; i++ {
-		_, err := client.Get(fmt.Sprintf("%s/api/v1/some-data", baseAddress))
+		res, err := client.Get(fmt.Sprintf("%s/api/v1/some-data", baseAddress))
 		if err != nil {
 			c.Error(err)
 		}
+		c.Assert(res.StatusCode, gocheck.Equals, http.StatusOK)
 	}
 }
