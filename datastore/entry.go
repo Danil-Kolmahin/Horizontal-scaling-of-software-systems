@@ -38,30 +38,36 @@ func (e *entry) Decode(input []byte) {
 func readValue(in *bufio.Reader) (string, error) {
 	header, err := in.Peek(8)
 	if err != nil {
+		fmt.Println("error e1")
 		return "", err
 	}
 	keySize := int(binary.LittleEndian.Uint32(header[4:]))
 	_, err = in.Discard(keySize + 8)
 	if err != nil {
+		fmt.Println("error e2")
 		return "", err
 	}
 
 	header, err = in.Peek(4)
 	if err != nil {
+		fmt.Println("error e3")
 		return "", err
 	}
 	valSize := int(binary.LittleEndian.Uint32(header))
 	_, err = in.Discard(4)
 	if err != nil {
+		fmt.Println("error e4")
 		return "", err
 	}
 
 	data := make([]byte, valSize)
 	n, err := in.Read(data)
 	if err != nil {
+		fmt.Println("error e5")
 		return "", err
 	}
 	if n != valSize {
+		fmt.Println("error e6")
 		return "", fmt.Errorf("can't read value bytes (read %d, expected %d)", n, valSize)
 	}
 
