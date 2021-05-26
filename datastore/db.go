@@ -14,7 +14,9 @@ import (
 
 const outFileName = "current-data"
 const segmentName = "segment-"
-const bufSize = 64
+
+var bufSize = 10 * 1024 * 1024
+
 const metaDataSize = 12
 
 var ErrNotFound = fmt.Errorf("record does not exist")
@@ -87,7 +89,7 @@ func (db *Db) recover() error {
 	}
 	defer input.Close()
 
-	var buf [bufSize]byte
+	buf := make([]byte, 0, bufSize)
 	in := bufio.NewReaderSize(input, bufSize)
 	for err == nil {
 		var (
@@ -104,7 +106,7 @@ func (db *Db) recover() error {
 		}
 		size := binary.LittleEndian.Uint32(header)
 
-		if size < bufSize {
+		if size < uint32(bufSize) {
 			data = buf[:size]
 		} else {
 			data = make([]byte, size)
@@ -201,25 +203,26 @@ func (db *Db) segmentation() error {
 	isChangedSegment := make(map[string][]normKV)
 	noDeletedKeys := make(map[string]bool)
 	for k := range db.index {
+		isFind := false
 		for sk, sv := range segments {
-			if sk != outFileName {
-				_, find := sv.index[k]
-				if find {
-					value, err := db.getFromOne(k)
-					if err != nil {
-						fmt.Println("error 2")
-						return err
-					}
-					isChangedSegment[sk] = append(isChangedSegment[sk], normKV{key: k, value: value})
-					break
+			_, find := sv.index[k]
+			if sk != outFileName && find {
+				isFind = true
+				value, err := db.getFromOne(k)
+				if err != nil {
+					fmt.Println("error 2")
+					return err
 				}
+				isChangedSegment[sk] = append(isChangedSegment[sk], normKV{key: k, value: value})
+				break
 			}
+		}
+		if !isFind {
 			noDeletedKeys[k] = true
 		}
 	}
 
 	for sName, norms := range isChangedSegment {
-		fmt.Println(norms)
 		normSegmentValues := make(map[string]string)
 		for k := range segments[sName].index {
 			val, err := segments[sName].getFromOne(k)
@@ -238,8 +241,8 @@ func (db *Db) segmentation() error {
 		if err != nil {
 			return err
 		}
-		for k,v := range normSegmentValues {
-			err := segments[sName].Put(k,v)
+		for k, v := range normSegmentValues {
+			err := segments[sName].Put(k, v)
 			if err != nil {
 				fmt.Println("error here")
 				return err
@@ -255,6 +258,7 @@ func (db *Db) segmentation() error {
 			return err
 		}
 		for key := range noDeletedKeys {
+			fmt.Println(key)
 			val, err := db.Get(key)
 			if err != nil {
 				fmt.Println("error 61")
