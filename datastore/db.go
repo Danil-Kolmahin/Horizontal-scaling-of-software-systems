@@ -10,16 +10,20 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const outFileName = "current-data"
 const segmentName = "segment-"
 
+var wg = sync.WaitGroup{}
+
 var bufSize = 10 * 1024 * 1024
 
-const metaDataSize = 12
+const metaDataSize = 16
 
 var ErrNotFound = fmt.Errorf("record does not exist")
+var WrongDataType = fmt.Errorf("wrong data type")
 
 type hashIndex map[string]int64
 
@@ -131,61 +135,84 @@ func (db *Db) Close() error {
 	return db.out.Close()
 }
 
-func (db *Db) getFromOne(key string) (string, error) {
+func (db *Db) getFromOne(key string) (string, string, error) {
 	position, ok := db.index[key]
 	if !ok {
-		return "", ErrNotFound
+		return "", "", ErrNotFound
 	}
 
 	file, err := os.Open(db.outPath)
 	if err != nil {
 		fmt.Println("error g2")
-		return "", err
+		return "", "", err
 	}
 	defer file.Close()
 
 	_, err = file.Seek(position, 0)
 	if err != nil {
 		fmt.Println("error g3")
-		return "", err
+		return "", "", err
 	}
 
 	reader := bufio.NewReader(file)
-	value, err := readValue(reader)
+	value, typeValue, err := readValue(reader)
 	if err != nil {
 		fmt.Println("error g4")
-		return "", err
+		return "", "", err
 	}
-	return value, nil
+	return value, typeValue, nil
+}
+
+func (db *Db) GetInt64(key string) (int64, error) {
+	wg.Wait()
+	wg.Add(1)
+	counter := 0
+	for _, currentDB := range segments {
+		counter++
+		value, typeValue, finalError := currentDB.getFromOne(key)
+		if finalError == nil && typeValue == "int64" {
+			res, err := strconv.Atoi(value)
+			if err != nil {
+				wg.Done()
+				return -1, WrongDataType
+			}
+			wg.Done()
+			return int64(res), nil
+		}
+		if counter == len(segments) {
+			wg.Done()
+			return -1, finalError
+		}
+	}
+	wg.Done()
+	return -1, ErrNotFound
 }
 
 func (db *Db) Get(key string) (string, error) {
+	wg.Wait()
+	wg.Add(1)
 	counter := 0
 	for _, currentDB := range segments {
-		//fmt.Println(counter)
 		counter++
-		value, finalError := currentDB.getFromOne(key)
-		if finalError == nil {
+		value, typeValue, finalError := currentDB.getFromOne(key)
+		if finalError == nil && typeValue == "string" {
+			wg.Done()
 			return value, nil
 		}
 		if counter == len(segments) {
+			wg.Done()
 			return "", finalError
 		}
 	}
+	wg.Done()
 	return "", ErrNotFound
 }
 
-func (db *Db) Put(key, value string) error {
-	if int(db.outOffset)+len(key)+len(value)+metaDataSize >= bufSize {
-		err := db.segmentation()
-		if err != nil {
-			fmt.Println("error p1")
-			return err
-		}
-	}
+func (db *Db) putFromOne(key, value, typeValue string) error {
 	e := entry{
-		key:   key,
-		value: value,
+		key:       key,
+		value:     value,
+		typeValue: typeValue,
 	}
 	n, err := db.out.Write(e.Encode())
 	if err == nil {
@@ -195,10 +222,46 @@ func (db *Db) Put(key, value string) error {
 	return err
 }
 
+func (db *Db) PutInt64(key string, value int64) error {
+	wg.Wait()
+	wg.Add(1)
+	s := fmt.Sprintf("%d", value)
+	if int(db.outOffset)+len(key)+len(s)+metaDataSize >= bufSize {
+		err := db.segmentation()
+		if err != nil {
+			wg.Done()
+			fmt.Println("error p1")
+			return err
+		}
+	}
+	wg.Done()
+	return db.putFromOne(key, s, "int64")
+}
+
+func (db *Db) Put(key, value string) error {
+	wg.Wait()
+	wg.Add(1)
+	if int(db.outOffset)+len(key)+len(value)+metaDataSize >= bufSize {
+		err := db.segmentation()
+		if err != nil {
+			wg.Done()
+			fmt.Println("error p1")
+			return err
+		}
+	}
+	wg.Done()
+	return db.putFromOne(key, value, "string")
+}
+
 func (db *Db) segmentation() error {
 	type normKV = struct {
 		key   string
 		value string
+		typeV string
+	}
+	type normVT = struct {
+		value string
+		typeV string
 	}
 	isChangedSegment := make(map[string][]normKV)
 	noDeletedKeys := make(map[string]bool)
@@ -208,12 +271,12 @@ func (db *Db) segmentation() error {
 			_, find := sv.index[k]
 			if sk != outFileName && find {
 				isFind = true
-				value, err := db.getFromOne(k)
+				value, typeValue, err := db.getFromOne(k)
 				if err != nil {
 					fmt.Println("error 2")
 					return err
 				}
-				isChangedSegment[sk] = append(isChangedSegment[sk], normKV{key: k, value: value})
+				isChangedSegment[sk] = append(isChangedSegment[sk], normKV{key: k, value: value, typeV: typeValue})
 				break
 			}
 		}
@@ -223,17 +286,17 @@ func (db *Db) segmentation() error {
 	}
 
 	for sName, norms := range isChangedSegment {
-		normSegmentValues := make(map[string]string)
+		normSegmentValues := make(map[string]normVT)
 		for k := range segments[sName].index {
-			val, err := segments[sName].getFromOne(k)
+			val, typeValue, err := segments[sName].getFromOne(k)
 			if err != nil {
 				return err
 			}
-			normSegmentValues[k] = val
+			normSegmentValues[k] = normVT{value: val, typeV: typeValue}
 		}
 
 		for _, obj := range norms {
-			normSegmentValues[obj.key] = obj.value
+			normSegmentValues[obj.key] = normVT{value: obj.value, typeV: obj.typeV}
 		}
 
 		err := os.Truncate(filepath.Join(segments[sName].outPath), 0)
@@ -242,10 +305,20 @@ func (db *Db) segmentation() error {
 			return err
 		}
 		for k, v := range normSegmentValues {
-			err := segments[sName].Put(k, v)
-			if err != nil {
-				fmt.Println("error here")
-				return err
+			if v.typeV == "string" {
+				err = segments[sName].putFromOne(k, v.value, "string")
+				if err != nil {
+					fmt.Println("error here")
+					return err
+				}
+			} else if v.typeV == "int64" {
+				_, err := strconv.Atoi(v.value)
+				if err != nil {
+					return WrongDataType
+				}
+				err = segments[sName].putFromOne(k, v.value, "int64")
+			} else {
+				return WrongDataType
 			}
 		}
 	}
@@ -258,16 +331,25 @@ func (db *Db) segmentation() error {
 			return err
 		}
 		for key := range noDeletedKeys {
-			fmt.Println(key)
-			val, err := db.Get(key)
+			val, typeValue, err := db.getFromOne(key)
 			if err != nil {
 				fmt.Println("error 61")
 				return err
 			}
-			err = newDb.Put(key, val)
-			if err != nil {
-				fmt.Println("error 6")
-				return err
+			if typeValue == "string" {
+				err = newDb.putFromOne(key, val, "string")
+				if err != nil {
+					fmt.Println("error 6")
+					return err
+				}
+			} else if typeValue == "int64" {
+				_, err := strconv.Atoi(val)
+				if err != nil {
+					return WrongDataType
+				}
+				err = newDb.putFromOne(key, val, "int64")
+			} else {
+				return WrongDataType
 			}
 		}
 		segments[segment] = newDb
