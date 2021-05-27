@@ -49,59 +49,49 @@ func (e *entry) Decode(input []byte) {
 func readValue(in *bufio.Reader) (string, string, error) {
 	header, err := in.Peek(8)
 	if err != nil {
-		fmt.Println("error e1")
 		return "", "", err
 	}
 	keySize := int(binary.LittleEndian.Uint32(header[4:]))
 	_, err = in.Discard(keySize + 8)
 	if err != nil {
-		fmt.Println("error e2")
 		return "", "", err
 	}
 
 	header, err = in.Peek(4)
 	if err != nil {
-		fmt.Println("error e3")
 		return "", "", err
 	}
 	valSize := int(binary.LittleEndian.Uint32(header))
 	_, err = in.Discard(4)
 	if err != nil {
-		fmt.Println("error e4")
 		return "", "", err
 	}
 
 	dataValue := make([]byte, valSize)
 	n, err := in.Read(dataValue)
 	if err != nil {
-		fmt.Println("error e5")
 		return "", "", err
 	}
 	if n != valSize {
-		fmt.Println("error e6")
 		return "", "", fmt.Errorf("can't read value bytes (read %d, expected %d)", n, valSize)
 	}
 
 	header, err = in.Peek(4)
 	if err != nil {
-		fmt.Println("error e3")
 		return "", "", err
 	}
 	typeSize := int(binary.LittleEndian.Uint32(header))
 	_, err = in.Discard(4)
 	if err != nil {
-		fmt.Println("error e4")
 		return "", "", err
 	}
 
 	dataType := make([]byte, typeSize)
 	n, err = in.Read(dataType)
 	if err != nil {
-		fmt.Println("error e5")
 		return "", "", err
 	}
 	if n != typeSize {
-		fmt.Println("error e6")
 		return "", "", fmt.Errorf("can't read value bytes (read %d, expected %d)", n, valSize)
 	}
 

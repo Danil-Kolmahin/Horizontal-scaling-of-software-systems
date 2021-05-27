@@ -20,6 +20,17 @@ go_testedbinary {
   ]
 }
 
+go_testedbinary {
+  name: "db",
+  pkg: "github.com/KolmaginDanil/Horizontal-scaling-of-software-systems/cmd/db",
+  testPkg: "github.com/KolmaginDanil/Horizontal-scaling-of-software-systems/cmd/db",
+  srcs: [
+    "httptools/**/*.go",
+    "signal/**/*.go",
+    "cmd/lb/*.go"
+  ]
+}
+
 // TODO: Додайте модуль для інтеграційних тестів.
 integration_tests {
   name: "integration",

@@ -143,21 +143,18 @@ func (db *Db) getFromOne(key string) (string, string, error) {
 
 	file, err := os.Open(db.outPath)
 	if err != nil {
-		fmt.Println("error g2")
 		return "", "", err
 	}
 	defer file.Close()
 
 	_, err = file.Seek(position, 0)
 	if err != nil {
-		fmt.Println("error g3")
 		return "", "", err
 	}
 
 	reader := bufio.NewReader(file)
 	value, typeValue, err := readValue(reader)
 	if err != nil {
-		fmt.Println("error g4")
 		return "", "", err
 	}
 	return value, typeValue, nil
@@ -209,6 +206,9 @@ func (db *Db) Get(key string) (string, error) {
 }
 
 func (db *Db) putFromOne(key, value, typeValue string) error {
+	if typeValue != "string" && typeValue != "int64" {
+		return WrongDataType
+	}
 	e := entry{
 		key:       key,
 		value:     value,
@@ -230,7 +230,6 @@ func (db *Db) PutInt64(key string, value int64) error {
 		err := db.segmentation()
 		if err != nil {
 			wg.Done()
-			fmt.Println("error p1")
 			return err
 		}
 	}
@@ -245,7 +244,6 @@ func (db *Db) Put(key, value string) error {
 		err := db.segmentation()
 		if err != nil {
 			wg.Done()
-			fmt.Println("error p1")
 			return err
 		}
 	}
@@ -273,7 +271,6 @@ func (db *Db) segmentation() error {
 				isFind = true
 				value, typeValue, err := db.getFromOne(k)
 				if err != nil {
-					fmt.Println("error 2")
 					return err
 				}
 				isChangedSegment[sk] = append(isChangedSegment[sk], normKV{key: k, value: value, typeV: typeValue})
@@ -308,7 +305,6 @@ func (db *Db) segmentation() error {
 			if v.typeV == "string" {
 				err = segments[sName].putFromOne(k, v.value, "string")
 				if err != nil {
-					fmt.Println("error here")
 					return err
 				}
 			} else if v.typeV == "int64" {
@@ -327,19 +323,16 @@ func (db *Db) segmentation() error {
 		segment := segmentName + strconv.Itoa(len(segments))
 		newDb, err := fillMap(segment)
 		if err != nil {
-			fmt.Println("error 5")
 			return err
 		}
 		for key := range noDeletedKeys {
 			val, typeValue, err := db.getFromOne(key)
 			if err != nil {
-				fmt.Println("error 61")
 				return err
 			}
 			if typeValue == "string" {
 				err = newDb.putFromOne(key, val, "string")
 				if err != nil {
-					fmt.Println("error 6")
 					return err
 				}
 			} else if typeValue == "int64" {
@@ -358,7 +351,6 @@ func (db *Db) segmentation() error {
 	err := os.Truncate(filepath.Join(db.outPath), 0)
 	db.outOffset = 0
 	if err != nil {
-		fmt.Println("error 7")
 		return err
 	}
 	db.index = make(hashIndex)
