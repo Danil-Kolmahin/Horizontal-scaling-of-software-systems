@@ -16,8 +16,6 @@ import (
 const outFileName = "current-data"
 const segmentName = "segment-"
 
-var wg = sync.WaitGroup{}
-
 var bufSize = 10 * 1024 * 1024
 
 const metaDataSize = 16
@@ -27,7 +25,7 @@ var WrongDataType = fmt.Errorf("wrong data type")
 
 type hashIndex map[string]int64
 
-var segments = make(map[string]*Db)
+//var segments = make(map[string]*Db)
 
 var directory = "."
 
@@ -35,8 +33,9 @@ type Db struct {
 	out       *os.File // opened file
 	outPath   string   //path to file where we reade inf
 	outOffset int64    //size
-
-	index hashIndex //map of hash to value
+	dbLock    *sync.RWMutex
+	segments  map[string]*Db
+	index     hashIndex //map of hash to value
 }
 
 func NewDb(dir string) (*Db, error) {
@@ -45,27 +44,21 @@ func NewDb(dir string) (*Db, error) {
 	if err != nil {
 		return nil, err
 	}
-	isFindOut := false
 	for _, file := range files {
 		if strings.Contains(file.Name(), segmentName) || outFileName == file.Name() {
-			if outFileName == file.Name() {
-				isFindOut = true
-			}
 			db, err := fillMap(file.Name())
 			if err != nil {
 				return nil, err
 			}
-			segments[file.Name()] = db
+			db.segments[file.Name()] = db //!!!!!
 		}
 	}
-	if !isFindOut {
-		db, err := fillMap(outFileName)
-		if err != nil {
-			return nil, err
-		}
-		segments[outFileName] = db
+	db, err := fillMap(outFileName)
+	if err != nil {
+		return nil, err
 	}
-	return segments[outFileName], nil
+	db.segments[outFileName] = db
+	return db.segments[outFileName], nil
 }
 
 func fillMap(name string) (*Db, error) {
@@ -75,9 +68,11 @@ func fillMap(name string) (*Db, error) {
 		return nil, err
 	}
 	db := &Db{
-		outPath: outputPath,
-		out:     f,
-		index:   make(hashIndex),
+		outPath:  outputPath,
+		out:      f,
+		index:    make(hashIndex),
+		dbLock:   new(sync.RWMutex),
+		segments: make(map[string]*Db),
 	}
 	err = db.recover()
 	if err != nil && err != io.EOF {
@@ -161,52 +156,45 @@ func (db *Db) getFromOne(key string) (string, string, error) {
 }
 
 func (db *Db) GetInt64(key string) (int64, error) {
-	wg.Wait()
-	wg.Add(1)
+	db.dbLock.RLock()
+	defer db.dbLock.RUnlock()
 	counter := 0
-	for _, currentDB := range segments {
+	for _, currentDB := range db.segments {
 		counter++
 		value, typeValue, finalError := currentDB.getFromOne(key)
-		if finalError == nil && typeValue == "int64" {
+		if finalError == nil && typeValue == "i" {
 			res, err := strconv.Atoi(value)
 			if err != nil {
-				wg.Done()
 				return -1, WrongDataType
 			}
-			wg.Done()
 			return int64(res), nil
 		}
-		if counter == len(segments) {
-			wg.Done()
+		if counter == len(db.segments) {
 			return -1, finalError
 		}
 	}
-	wg.Done()
 	return -1, ErrNotFound
 }
 
 func (db *Db) Get(key string) (string, error) {
-	wg.Wait()
-	wg.Add(1)
+	db.dbLock.RLock()
+	defer db.dbLock.RUnlock()
 	counter := 0
-	for _, currentDB := range segments {
+	for _, currentDB := range db.segments {
 		counter++
 		value, typeValue, finalError := currentDB.getFromOne(key)
-		if finalError == nil && typeValue == "string" {
-			wg.Done()
+		if finalError == nil && typeValue == "s" {
 			return value, nil
 		}
-		if counter == len(segments) {
-			wg.Done()
+		if counter == len(db.segments) {
 			return "", finalError
 		}
 	}
-	wg.Done()
 	return "", ErrNotFound
 }
 
 func (db *Db) putFromOne(key, value, typeValue string) error {
-	if typeValue != "string" && typeValue != "int64" {
+	if typeValue != "s" && typeValue != "i" {
 		return WrongDataType
 	}
 	e := entry{
@@ -223,32 +211,28 @@ func (db *Db) putFromOne(key, value, typeValue string) error {
 }
 
 func (db *Db) PutInt64(key string, value int64) error {
-	wg.Wait()
-	wg.Add(1)
+	db.dbLock.RLock()
+	defer db.dbLock.RUnlock()
 	s := fmt.Sprintf("%d", value)
 	if int(db.outOffset)+len(key)+len(s)+metaDataSize >= bufSize {
 		err := db.segmentation()
 		if err != nil {
-			wg.Done()
 			return err
 		}
 	}
-	wg.Done()
-	return db.putFromOne(key, s, "int64")
+	return db.putFromOne(key, s, "i")
 }
 
 func (db *Db) Put(key, value string) error {
-	wg.Wait()
-	wg.Add(1)
+	db.dbLock.RLock()
+	defer db.dbLock.RUnlock()
 	if int(db.outOffset)+len(key)+len(value)+metaDataSize >= bufSize {
 		err := db.segmentation()
 		if err != nil {
-			wg.Done()
 			return err
 		}
 	}
-	wg.Done()
-	return db.putFromOne(key, value, "string")
+	return db.putFromOne(key, value, "s")
 }
 
 func (db *Db) segmentation() error {
@@ -265,7 +249,7 @@ func (db *Db) segmentation() error {
 	noDeletedKeys := make(map[string]bool)
 	for k := range db.index {
 		isFind := false
-		for sk, sv := range segments {
+		for sk, sv := range db.segments {
 			_, find := sv.index[k]
 			if sk != outFileName && find {
 				isFind = true
@@ -284,8 +268,8 @@ func (db *Db) segmentation() error {
 
 	for sName, norms := range isChangedSegment {
 		normSegmentValues := make(map[string]normVT)
-		for k := range segments[sName].index {
-			val, typeValue, err := segments[sName].getFromOne(k)
+		for k := range db.segments[sName].index {
+			val, typeValue, err := db.segments[sName].getFromOne(k)
 			if err != nil {
 				return err
 			}
@@ -296,23 +280,23 @@ func (db *Db) segmentation() error {
 			normSegmentValues[obj.key] = normVT{value: obj.value, typeV: obj.typeV}
 		}
 
-		err := os.Truncate(filepath.Join(segments[sName].outPath), 0)
-		segments[sName].outOffset = 0
+		err := os.Truncate(filepath.Join(db.segments[sName].outPath), 0)
+		db.segments[sName].outOffset = 0
 		if err != nil {
 			return err
 		}
 		for k, v := range normSegmentValues {
-			if v.typeV == "string" {
-				err = segments[sName].putFromOne(k, v.value, "string")
+			if v.typeV == "s" {
+				err = db.segments[sName].putFromOne(k, v.value, "s")
 				if err != nil {
 					return err
 				}
-			} else if v.typeV == "int64" {
+			} else if v.typeV == "i" {
 				_, err := strconv.Atoi(v.value)
 				if err != nil {
 					return WrongDataType
 				}
-				err = segments[sName].putFromOne(k, v.value, "int64")
+				err = db.segments[sName].putFromOne(k, v.value, "i")
 			} else {
 				return WrongDataType
 			}
@@ -320,7 +304,7 @@ func (db *Db) segmentation() error {
 	}
 
 	if len(noDeletedKeys) != 0 {
-		segment := segmentName + strconv.Itoa(len(segments))
+		segment := segmentName + strconv.Itoa(len(db.segments))
 		newDb, err := fillMap(segment)
 		if err != nil {
 			return err
@@ -330,22 +314,22 @@ func (db *Db) segmentation() error {
 			if err != nil {
 				return err
 			}
-			if typeValue == "string" {
-				err = newDb.putFromOne(key, val, "string")
+			if typeValue == "s" {
+				err = newDb.putFromOne(key, val, "s")
 				if err != nil {
 					return err
 				}
-			} else if typeValue == "int64" {
+			} else if typeValue == "i" {
 				_, err := strconv.Atoi(val)
 				if err != nil {
 					return WrongDataType
 				}
-				err = newDb.putFromOne(key, val, "int64")
+				err = newDb.putFromOne(key, val, "i")
 			} else {
 				return WrongDataType
 			}
 		}
-		segments[segment] = newDb
+		db.segments[segment] = newDb
 	}
 
 	err := os.Truncate(filepath.Join(db.outPath), 0)

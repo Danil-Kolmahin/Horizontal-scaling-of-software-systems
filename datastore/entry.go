@@ -15,6 +15,9 @@ func (e *entry) Encode() []byte {
 	kl := len(e.key)
 	vl := len(e.value)
 	tl := len(e.typeValue)    //
+	if tl != 1 {
+		fmt.Errorf("type value is very long [%d] vs [%d]", tl, 1)
+	}
 	size := kl + vl + 16 + tl //
 	res := make([]byte, size)
 	binary.LittleEndian.PutUint32(res, uint32(size))
